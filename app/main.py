@@ -31,6 +31,11 @@ async def http_exception_handler(_: Request, exc: HTTPException):
 
 
 @app.get("/", response_class=HTMLResponse)
+def index_page(request: Request):
+    return templates.TemplateResponse(request, "about.html")
+
+
+@app.get("/signup", response_class=HTMLResponse)
 def signup_page(request: Request):
     return templates.TemplateResponse(request, "signup.html")
 
@@ -43,6 +48,7 @@ def login_page(request: Request):
 @app.get("/about", response_class=HTMLResponse)
 def about_page(request: Request):
     return templates.TemplateResponse(request, "about.html")
+
 
 
 
