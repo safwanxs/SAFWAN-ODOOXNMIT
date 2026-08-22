@@ -19,6 +19,7 @@ def upgrade() -> None:
         sa.Column("company_code", sa.String(length=16), nullable=False, unique=True),
         sa.Column("logo_url", sa.String(length=500), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
     )
     op.create_table(
         "users",
