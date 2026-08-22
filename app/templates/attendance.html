@@ -1,6 +1,6 @@
 <!doctype html>
 <html><body>
-<nav><a href="/employees">Employees</a> | <a href="/attendance/view">Attendance</a> | <a href="/time-off">Time Off</a></nav>
+<nav><a href="/employees">Employees</a> | <a href="/attendance/view">Attendance</a> | <a href="/time-off">Time Off</a> | <a href="/payroll">Payroll</a> | <a href="/dashboard">Dashboard</a></nav>
 <h1>Attendance</h1><section id="controls"></section><section id="summary"></section><table><thead><tr><th>Date</th><th>Employee</th><th>Status</th><th>Check in</th><th>Check out</th><th>Work hours</th><th>Extra hours</th></tr></thead><tbody id="rows"></tbody></table>
 <script>
 const headers={'Authorization':'Bearer '+localStorage.token};let me,selected=new Date(),displayMode='date',searchTerm='';

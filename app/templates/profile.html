@@ -1,5 +1,5 @@
 <!doctype html>
-<html><body><nav><a href="/employees">Employees</a> | <a href="/attendance/view">Attendance</a> | <a href="/time-off">Time Off</a></nav><h1 id="name">Profile</h1>
+<html><body><nav><a href="/employees">Employees</a> | <a href="/attendance/view">Attendance</a> | <a href="/time-off">Time Off</a> | <a href="/payroll">Payroll</a> | <a href="/dashboard">Dashboard</a></nav><h1 id="name">Profile</h1>
 <div id="tabs"><button data-tab="resume">Resume</button><button data-tab="private">Private Info</button><button id="salary-tab" data-tab="salary" hidden>Salary Info</button><button data-tab="security">Security</button></div><pre id="content"></pre><p id="actions"></p>
 <script>
 const userId={{ user_id }},headers={'Authorization':'Bearer '+localStorage.token};let me,profile;

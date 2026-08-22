@@ -78,7 +78,7 @@ def read_salary(user_id: int, _: User = Depends(require_role("admin")), db: Sess
     salary = db.scalar(select(SalaryStructure).where(SalaryStructure.user_id == user_id))
     if salary is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Salary structure not found")
-    return SalaryResponse(user_id=salary.user_id, wage_type=salary.wage_type, total_wage=salary.total_wage, components=salary.components)
+    return SalaryResponse(user_id=salary.user_id, wage_type=salary.wage_type, total_wage=salary.total_wage, components=salary.components, pf_employee_percent=salary.pf_employee_percent, pf_employer_percent=salary.pf_employer_percent, professional_tax=salary.professional_tax)
 
 
 @router.put("/{user_id}/salary", response_model=SalaryResponse)
@@ -91,6 +91,9 @@ def update_salary(user_id: int, payload: SalaryUpdate, admin: User = Depends(req
     salary.wage_type = payload.wage_type
     salary.total_wage = payload.total_wage
     salary.components = [item.model_dump(mode="json") for item in payload.components]
+    salary.pf_employee_percent = payload.pf_employee_percent
+    salary.pf_employer_percent = payload.pf_employer_percent
+    salary.professional_tax = payload.professional_tax
     db.commit()
     db.refresh(salary)
-    return SalaryResponse(user_id=salary.user_id, wage_type=salary.wage_type, total_wage=salary.total_wage, components=salary.components)
+    return SalaryResponse(user_id=salary.user_id, wage_type=salary.wage_type, total_wage=salary.total_wage, components=salary.components, pf_employee_percent=salary.pf_employee_percent, pf_employer_percent=salary.pf_employer_percent, professional_tax=salary.professional_tax)

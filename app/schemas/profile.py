@@ -58,6 +58,9 @@ class SalaryUpdate(BaseModel):
     wage_type: Literal["monthly", "yearly"]
     total_wage: Decimal = Field(gt=0)
     components: list[SalaryComponent] = Field(default_factory=list)
+    pf_employee_percent: Decimal = Field(default=Decimal("12"), ge=0, le=100)
+    pf_employer_percent: Decimal = Field(default=Decimal("12"), ge=0, le=100)
+    professional_tax: Decimal = Field(default=Decimal("0"), ge=0)
 
     @model_validator(mode="after")
     def components_fit_total_wage(self):

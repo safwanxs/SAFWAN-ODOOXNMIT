@@ -1,0 +1,12 @@
+<!doctype html>
+<html><head><style>body{font-family:system-ui,sans-serif;margin:2rem}table{border-collapse:collapse}th,td{padding:.4rem;border:1px solid #ddd}#state{color:#555}</style></head><body>
+<nav><a href="/employees">Employees</a> | <a href="/attendance/view">Attendance</a> | <a href="/time-off">Time Off</a> | <a href="/dashboard">Dashboard</a></nav>
+<h1>Payroll readiness preview</h1><div id="controls"></div><p id="state">Loading payroll preview…</p><section id="result" hidden></section>
+<script>
+const headers={Authorization:'Bearer '+localStorage.token};const now=new Date();
+async function api(url){const r=await fetch(url,{headers});if(!r.ok)throw new Error((await r.json()).detail);return r.json()}
+function render(d){state.hidden=true;result.hidden=false;result.innerHTML=`<p>Payable days: <b>${d.payable_days}/${d.total_working_days}</b> · Present: ${d.present_days} · Paid leave: ${d.paid_leave_days} · Unpaid leave: ${d.unpaid_leave_days} · Missing: ${d.missing_attendance_days}</p><table><tr><th>Monthly wage</th><td>${d.monthly_wage}</td></tr><tr><th>Gross pay</th><td>${d.gross_pay}</td></tr><tr><th>Employee PF</th><td>${d.provident_fund_employee}</td></tr><tr><th>Professional tax</th><td>${d.professional_tax}</td></tr><tr><th>Net pay</th><td><b>${d.net_pay}</b></td></tr></table><h2>Components</h2><table><tr><th>Name</th><th>Monthly</th><th>Payable</th></tr>${d.components.map(c=>`<tr><td>${c.name}</td><td>${c.monthly_amount}</td><td>${c.payable_amount}</td></tr>`).join('')||'<tr><td colspan="3">No salary components defined.</td></tr>'}</table>`}
+async function load(){try{const me=await api('/auth/me');let userId=me.id;if(me.role==='admin'){const people=await api('/api/employees');controls.innerHTML=`<label>Employee <select id="employee">${people.filter(p=>p.role==='employee').map(p=>`<option value="${p.id}">${p.first_name} ${p.last_name}</option>`).join('')}</select></label>`;employee.onchange=()=>show(employee.value)}await show(userId)}catch(e){state.textContent='Unable to load payroll: '+e.message}}
+async function show(userId){state.hidden=false;result.hidden=true;const me=await api('/auth/me');const endpoint=me.role==='admin'?'/api/payroll/'+userId:'/api/payroll/me';try{render(await api(endpoint+'?month='+(now.getMonth()+1)+'&year='+now.getFullYear()))}catch(e){state.textContent='No payroll preview available: '+e.message}}
+load();
+</script></body></html>

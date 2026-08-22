@@ -1,6 +1,6 @@
 <!doctype html>
 <html><body>
-<nav><a href="/employees">Employees</a> | <a href="/attendance/view">Attendance</a> | <a href="/time-off">Time Off</a></nav>
+<nav><a href="/employees">Employees</a> | <a href="/attendance/view">Attendance</a> | <a href="/time-off">Time Off</a> | <a href="/payroll">Payroll</a> | <a href="/dashboard">Dashboard</a></nav>
 <h1>Time Off</h1><section id="summary"></section><section id="request-form"></section><section id="calendar"></section><table><thead><tr><th>Employee</th><th>Type</th><th>Start</th><th>End</th><th>Days</th><th>Status</th><th>Comment</th><th>Action</th></tr></thead><tbody id="rows"></tbody></table>
 <script>
 const headers={'Authorization':'Bearer '+localStorage.token};let me;

@@ -8,6 +8,7 @@ from sqlalchemy.pool import StaticPool
 from app.database import Base, get_db
 from app.main import app
 from app.models.attendance import Attendance
+from app.models.leave_request import LeaveRequest
 
 engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -258,3 +259,84 @@ def test_employee_cannot_see_other_employee_leave_requests():
     assert own.status_code == 200
     assert own.json() == []
     assert all_requests.status_code == 403
+
+
+def test_payroll_preview_prorates_wage_from_attendance_and_unpaid_leave():
+    with TestClient(app) as client:
+        signup(client)
+        admin = admin_token(client)
+        employee = create_employee(client, admin).json()
+        salary = client.put(f"/api/profiles/{employee['id']}/salary", headers=auth_header(admin), json={
+            "wage_type": "monthly", "total_wage": "10000",
+            "components": [{"name": "Basic", "kind": "percent", "value": "50"}, {"name": "HRA", "kind": "fixed", "value": "1000"}],
+            "pf_employee_percent": "12", "pf_employer_percent": "12", "professional_tax": "200",
+        })
+        db = TestingSessionLocal()
+        db.add_all([
+            Attendance(user_id=employee["id"], date=date(2026, 6, 1), check_in_time=datetime(2026, 6, 1, 9, tzinfo=timezone.utc), check_out_time=datetime(2026, 6, 1, 17, tzinfo=timezone.utc)),
+            LeaveRequest(user_id=employee["id"], leave_type="sick_leave", start_date=date(2026, 6, 2), end_date=date(2026, 6, 2), days_requested=1, status="approved"),
+            LeaveRequest(user_id=employee["id"], leave_type="unpaid_leave", start_date=date(2026, 6, 3), end_date=date(2026, 6, 3), days_requested=1, status="approved"),
+        ])
+        db.commit()
+        db.close()
+        preview = client.get(f"/api/payroll/{employee['id']}?month=6&year=2026", headers=auth_header(admin))
+    assert salary.status_code == 200
+    assert preview.status_code == 200
+    data = preview.json()
+    assert data["total_working_days"] == 22
+    assert data["payable_days"] == 2
+    assert data["paid_leave_days"] == 1
+    assert data["unpaid_leave_days"] == 1
+    assert data["missing_attendance_days"] == 19
+    assert data["gross_pay"] == "909.09"
+    assert data["total_deductions"] == "72.73"
+    assert data["net_pay"] == "836.36"
+
+
+def test_salary_components_cannot_exceed_wage_and_payroll_is_admin_scoped():
+    with TestClient(app) as client:
+        signup(client)
+        admin = admin_token(client)
+        employee = create_employee(client, admin).json()
+        employee_token = activate_employee(client, employee)
+        invalid = client.put(f"/api/profiles/{employee['id']}/salary", headers=auth_header(admin), json={
+            "wage_type": "monthly", "total_wage": "1000", "components": [{"name": "Basic", "kind": "fixed", "value": "1001"}],
+        })
+        forbidden = client.get(f"/api/payroll/{employee['id']}?month=6&year=2026", headers=auth_header(employee_token))
+    assert invalid.status_code == 422
+    assert "cannot exceed" in invalid.text
+    assert forbidden.status_code == 403
+
+
+def test_employee_can_view_own_payroll_preview_but_not_without_salary_structure():
+    with TestClient(app) as client:
+        signup(client)
+        admin = admin_token(client)
+        employee = create_employee(client, admin).json()
+        employee_token = activate_employee(client, employee)
+        missing = client.get("/api/payroll/me?month=6&year=2026", headers=auth_header(employee_token))
+        client.put(f"/api/profiles/{employee['id']}/salary", headers=auth_header(admin), json={"wage_type": "monthly", "total_wage": "12000", "components": []})
+        own = client.get("/api/payroll/me?month=6&year=2026", headers=auth_header(employee_token))
+    assert missing.status_code == 404
+    assert own.status_code == 200
+    assert own.json()["user_id"] == employee["id"]
+
+
+def test_admin_dashboard_aggregates_existing_company_data():
+    with TestClient(app) as client:
+        signup(client)
+        admin = admin_token(client)
+        employee = create_employee(client, admin).json()
+        request = client.post("/auth/login", json={"identifier": employee["login_id"], "password": employee["temporary_password"]})
+        dashboard = client.get("/api/dashboard", headers=auth_header(admin))
+        forbidden = client.get("/api/dashboard", headers=auth_header(request.json()["access_token"]))
+    assert dashboard.status_code == 200
+    assert dashboard.json()["headcount"] == 1
+    assert dashboard.json()["payroll_ready_count"] == 0
+    assert forbidden.status_code == 403
+
+def test_login_injection_string_is_rejected():
+    with TestClient(app) as client:
+        signup(client)
+        response = client.post("/auth/login", json={"identifier": "' OR 1=1", "password": "anything"})
+    assert response.status_code == 401
