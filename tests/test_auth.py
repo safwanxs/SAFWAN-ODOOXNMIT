@@ -203,3 +203,58 @@ def test_admin_day_attendance_includes_records_and_absences():
     assert rows[employee["id"]]["work_hours"] == 8.0
     assert rows[absent_employee["id"]]["status"] == "Absent"
     assert rows[absent_employee["id"]]["check_in_time"] is None
+
+
+def test_employee_requests_leave_within_allocation_and_overage_is_rejected():
+    with TestClient(app) as client:
+        signup(client)
+        employee = create_employee(client, admin_token(client)).json()
+        token = activate_employee(client, employee)
+        allocations = client.get("/leave/allocations/me", headers=auth_header(token))
+        request = client.post("/leave/requests", headers=auth_header(token), json={"leave_type": "paid_time_off", "start_date": "2026-06-01", "end_date": "2026-06-03", "remarks": "Family trip"})
+        overage = client.post("/leave/requests", headers=auth_header(token), json={"leave_type": "sick_leave", "start_date": "2026-07-01", "end_date": "2026-07-10"})
+    assert allocations.status_code == 200
+    assert next(item for item in allocations.json() if item["leave_type"] == "paid_time_off")["days_available"] == 24
+    assert request.status_code == 201
+    assert request.json()["days_requested"] == 3
+    assert request.json()["status"] == "pending"
+    assert overage.status_code == 400
+    assert "exceeds" in overage.json()["detail"]
+
+
+def test_admin_review_updates_allocation_and_attendance_leave_status():
+    with TestClient(app) as client:
+        signup(client)
+        admin = admin_token(client)
+        employee = create_employee(client, admin).json()
+        employee_token = activate_employee(client, employee)
+        request = client.post("/leave/requests", headers=auth_header(employee_token), json={"leave_type": "paid_time_off", "start_date": "2026-08-10", "end_date": "2026-08-11"}).json()
+        forbidden_review = client.patch(f"/leave/requests/{request['id']}", headers=auth_header(employee_token), json={"status": "approved"})
+        reviewed = client.patch(f"/leave/requests/{request['id']}", headers=auth_header(admin), json={"status": "approved", "admin_comment": "Approved"})
+        allocations = client.get("/leave/allocations/me", headers=auth_header(employee_token)).json()
+        employee_requests = client.get("/leave/requests/me", headers=auth_header(employee_token)).json()
+        report = client.get("/attendance?date=2026-08-10", headers=auth_header(admin)).json()
+        month = client.get("/attendance/me?month=8&year=2026", headers=auth_header(employee_token)).json()
+    assert forbidden_review.status_code == 403
+    assert reviewed.status_code == 200
+    assert reviewed.json()["status"] == "approved"
+    assert next(item for item in allocations if item["leave_type"] == "paid_time_off")["days_available"] == 22
+    assert employee_requests[0]["status"] == "approved"
+    assert next(row for row in report["attendance"] if row["user_id"] == employee["id"])["status"] == "Leave"
+    assert month["summary"]["leaves_count"] == 2
+
+
+def test_employee_cannot_see_other_employee_leave_requests():
+    with TestClient(app) as client:
+        signup(client)
+        admin = admin_token(client)
+        first = create_employee(client, admin, "john@example.com").json()
+        second = create_employee(client, admin, "jane@example.com").json()
+        first_token = activate_employee(client, first)
+        second_token = activate_employee(client, second)
+        client.post("/leave/requests", headers=auth_header(second_token), json={"leave_type": "sick_leave", "start_date": "2026-09-01", "end_date": "2026-09-01"})
+        own = client.get("/leave/requests/me", headers=auth_header(first_token))
+        all_requests = client.get("/leave/requests", headers=auth_header(first_token))
+    assert own.status_code == 200
+    assert own.json() == []
+    assert all_requests.status_code == 403
