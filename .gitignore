@@ -8,3 +8,5 @@ dayflow.db
 
 
 app/static/uploads/
+seed_credentials.txt
+seed_validation.db
