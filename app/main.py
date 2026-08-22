@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app.core.dependencies import require_password_changed
-from app.routers import admin, auth
+from app.routers import admin, attendance, auth, employees, profiles
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
@@ -16,6 +16,9 @@ app = FastAPI(title="Dayflow HRMS", version="0.1.0")
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 app.include_router(auth.router)
 app.include_router(admin.router)
+app.include_router(employees.router)
+app.include_router(profiles.router)
+app.include_router(attendance.router)
 
 
 @app.exception_handler(HTTPException)
@@ -39,5 +42,20 @@ def change_password_page(request: Request):
 
 
 @app.get("/employees", response_class=HTMLResponse)
-def employees_page(request: Request, _=Depends(require_password_changed)):
+def employees_page(request: Request):
     return templates.TemplateResponse(request, "employees_placeholder.html")
+
+
+@app.get("/profile/{user_id}", response_class=HTMLResponse)
+def profile_page(request: Request, user_id: int):
+    return templates.TemplateResponse(request, "profile.html", {"user_id": user_id})
+
+
+@app.get("/attendance", response_class=HTMLResponse)
+def attendance_page(request: Request):
+    return templates.TemplateResponse(request, "feature_placeholder.html", {"title": "Attendance"})
+
+
+@app.get("/time-off", response_class=HTMLResponse)
+def time_off_page(request: Request):
+    return templates.TemplateResponse(request, "feature_placeholder.html", {"title": "Time Off"})

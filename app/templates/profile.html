@@ -1,0 +1,10 @@
+<!doctype html>
+<html><body><nav><a href="/employees">Employees</a> | <a href="/attendance">Attendance</a> | <a href="/time-off">Time Off</a></nav><h1 id="name">Profile</h1>
+<div id="tabs"><button data-tab="resume">Resume</button><button data-tab="private">Private Info</button><button id="salary-tab" data-tab="salary" hidden>Salary Info</button><button data-tab="security">Security</button></div><pre id="content"></pre><p id="actions"></p>
+<script>
+const userId={{ user_id }},headers={'Authorization':'Bearer '+localStorage.token};let me,profile;
+async function api(url,options={}){let r=await fetch(url,{...options,headers:{...headers,...(options.headers||{})}});if(r.status===401||r.status===403){location='/login';throw Error('Not authorized')}return r}
+async function setup(){me=await (await api('/auth/me')).json();profile=await (await api('/api/profiles/'+userId)).json();name.textContent='Profile #'+userId;salaryTab.hidden=me.role!=='admin';show('resume')}
+function show(tab){let fields=tab==='resume'?['about','interests','skills','certifications']:tab==='private'?['phone','date_of_birth','address','nationality','personal_email','gender','marital_status','date_of_joining','bank_account_number','bank_name','ifsc','pan','uan']:[];if(tab==='security'){content.textContent='Use the change-password page to update your password.';actions.innerHTML='<a href="/change-password">Change password</a>';return}if(tab==='salary'){api('/api/profiles/'+userId+'/salary').then(async r=>content.textContent=r.ok?JSON.stringify(await r.json(),null,2):'No salary structure.');return}content.textContent=JSON.stringify(Object.fromEntries(fields.map(f=>[f,profile[f]])),null,2);actions.textContent=(me.id===userId||me.role==='admin')?'Profile updates are available through the protected API.':''}
+tabs.onclick=e=>{if(e.target.dataset.tab)show(e.target.dataset.tab)};setup();
+</script></body></html>
