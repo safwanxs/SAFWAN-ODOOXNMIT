@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from pathlib import Path
+from uuid import uuid4
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -12,6 +15,10 @@ from app.schemas.profile import ProfileResponse, ProfileUpdate, SalaryResponse, 
 router = APIRouter(prefix="/api/profiles", tags=["profiles"])
 PUBLIC_FIELDS = {"about", "interests", "skills", "certifications", "profile_picture_url"}
 SELF_EDITABLE_FIELDS = {"phone", "address", "profile_picture_url"}
+MAX_PROFILE_PICTURE_BYTES = 2 * 1024 * 1024
+PROFILE_PICTURE_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
+PROFILE_PICTURE_EXTENSIONS = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
+PROFILE_PICTURE_DIR = Path(__file__).resolve().parent.parent / "static" / "uploads" / "profile_pictures"
 
 
 def get_profile(db: Session, user_id: int) -> EmployeeProfile:
@@ -72,6 +79,44 @@ def update_profile(user_id: int, payload: ProfileUpdate, current_user: User = De
     db.refresh(profile)
     return profile_response(profile, user, True)
 
+
+@router.post("/{user_id}/picture", response_model=ProfileResponse)
+async def upload_profile_picture(
+    user_id: int,
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_password_changed),
+    db: Session = Depends(get_db),
+) -> ProfileResponse:
+    user = target_user(db, current_user, user_id)
+    if current_user.role.value != "admin" and current_user.id != user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You may only edit your own profile")
+    if file.content_type not in PROFILE_PICTURE_CONTENT_TYPES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Profile picture must be a JPEG, PNG, or WebP image")
+
+    contents = await file.read(MAX_PROFILE_PICTURE_BYTES + 1)
+    if len(contents) > MAX_PROFILE_PICTURE_BYTES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Profile picture must be 2 MB or smaller")
+
+    PROFILE_PICTURE_DIR.mkdir(parents=True, exist_ok=True)
+    filename = f"{user.id}_{uuid4().hex}{PROFILE_PICTURE_EXTENSIONS[file.content_type]}"
+    destination = PROFILE_PICTURE_DIR / filename
+    destination.write_bytes(contents)
+
+    profile = get_profile(db, user.id)
+    old_picture_url = profile.profile_picture_url
+    profile.profile_picture_url = f"/static/uploads/profile_pictures/{filename}"
+    db.commit()
+    db.refresh(profile)
+
+    if old_picture_url and old_picture_url.startswith("/static/uploads/profile_pictures/"):
+        try:
+            old_path = (PROFILE_PICTURE_DIR / old_picture_url.rsplit("/", 1)[-1]).resolve()
+            if old_path.is_relative_to(PROFILE_PICTURE_DIR.resolve()):
+                old_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+    return profile_response(profile, user, True)
 
 @router.get("/{user_id}/salary", response_model=SalaryResponse)
 def read_salary(user_id: int, _: User = Depends(require_role("admin")), db: Session = Depends(get_db)):

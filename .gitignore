@@ -6,3 +6,5 @@ __pycache__/
 dayflow.db
 *.sqlite3
 
+
+app/static/uploads/

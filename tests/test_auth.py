@@ -340,3 +340,37 @@ def test_login_injection_string_is_rejected():
         signup(client)
         response = client.post("/auth/login", json={"identifier": "' OR 1=1", "password": "anything"})
     assert response.status_code == 401
+
+def test_profile_picture_upload_allows_owner_and_rejects_bad_types_and_other_employees():
+    with TestClient(app) as client:
+        signup(client)
+        admin = admin_token(client)
+        employee = create_employee(client, admin, "john@example.com").json()
+        other = create_employee(client, admin, "jane@example.com").json()
+        employee_token = activate_employee(client, employee)
+        uploaded = client.post(
+            f"/api/profiles/{employee['id']}/picture",
+            headers=auth_header(employee_token),
+            files={"file": ("avatar.png", b"\x89PNG\r\n\x1a\nimage-data", "image/png")},
+        )
+        invalid_type = client.post(
+            f"/api/profiles/{employee['id']}/picture",
+            headers=auth_header(employee_token),
+            files={"file": ("notes.txt", b"not an image", "text/plain")},
+        )
+        forbidden = client.post(
+            f"/api/profiles/{other['id']}/picture",
+            headers=auth_header(employee_token),
+            files={"file": ("avatar.png", b"\x89PNG\r\n\x1a\nimage-data", "image/png")},
+        )
+        admin_uploaded = client.post(
+            f"/api/profiles/{other['id']}/picture",
+            headers=auth_header(admin),
+            files={"file": ("avatar.webp", b"RIFFwebp-data", "image/webp")},
+        )
+    assert uploaded.status_code == 200
+    assert uploaded.json()["profile_picture_url"].startswith("/static/uploads/profile_pictures/")
+    assert invalid_type.status_code == 400
+    assert "JPEG, PNG, or WebP" in invalid_type.json()["detail"]
+    assert forbidden.status_code == 403
+    assert admin_uploaded.status_code == 200
