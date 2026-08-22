@@ -12,6 +12,7 @@ Dayflow centralizes employee identity, attendance, leave, and payroll workflows 
 - **Attendance:** Check in/out actions with daily administrative reporting and employee monthly attendance views.
 - **Leave and time off:** Employees request paid, sick, or unpaid leave; administrators approve or reject with comments; allocations update on approval.
 - **Payroll preview — core differentiator:** Calculates payable days from attendance, public holidays, approved leave, and missing attendance. It prorates payroll and shows salary components, employee/employer PF, and professional tax.
+- **CSV export:** Administrators can export payroll-ready employees (those with a salary structure) to CSV containing login ID, name, role, wage, and email.
 - **Analytics dashboard:** Live headcount, check-in, attendance rate, pending-leave, and payroll-readiness metrics with Chart.js visualization.
 - **Demo data seeder:** A deterministic Faker-powered script creates a demo company, admin, configurable employee set, profiles, salary structures, attendance, leave activity, and credentials.
 
@@ -54,6 +55,11 @@ DATABASE_URL="sqlite:///./dayflow.db" python seed_demo_data.py
 
 The default creates 25 employees. Set `SEED_EMPLOYEE_COUNT` (3–100) for a different amount. For more than 15 employees, credentials are also written to `seed_credentials.txt`.
 
+### Demo credentials
+
+- **Admin:** `alex.rao@dayflowdemo.com` / `AdminPass123!`
+- **Employee credentials:** Individual employee temporary passwords are printed by `seed_demo_data.py` at seed time (and saved to `seed_credentials.txt` for seeded runs over 15 employees). They are not reproducible after the fact, so if a fresh seed run is performed, employee credentials must be recorded from that run's output.
+
 ## Deployment
 
 The live service is deployed on Render: https://dayflow-hrms-jq5c.onrender.com
@@ -71,4 +77,3 @@ pytest -q
 - Only profile pictures can be uploaded. The app does not provide a general document repository for resumes, certificates, or identity proofs.
 - Credentials and workflow notifications are not delivered by email; employees see relevant state only within the app.
 - Payroll is an on-demand preview rather than an immutable payroll-run system; it does not generate payslips or cover statutory rules for every jurisdiction.
-- The application does not currently include CSV export of payroll-ready employees.
