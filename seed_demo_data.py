@@ -23,7 +23,9 @@ from app.core.id_generator import generate_login_id, generate_temp_password  # n
 from app.core.security import hash_password  # noqa: E402
 from app.models.attendance import Attendance  # noqa: E402
 from app.models.company import Company  # noqa: E402
+from app.models.email_verification_token import EmailVerificationToken  # noqa: E402
 from app.models.employee_profile import EmployeeProfile  # noqa: E402
+
 from app.models.leave_allocation import LeaveAllocation  # noqa: E402
 from app.models.leave_request import LeaveRequest  # noqa: E402
 from app.models.public_holiday import PublicHoliday  # noqa: E402
@@ -103,8 +105,10 @@ try:
         db.execute(delete(SalaryStructure))
         db.execute(delete(EmployeeProfile))
         db.execute(delete(PublicHoliday))
+        db.execute(delete(EmailVerificationToken))
         db.execute(delete(User))
         db.execute(delete(Company))
+
         db.commit()
 
 
