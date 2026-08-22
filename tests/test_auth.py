@@ -91,7 +91,7 @@ def test_employee_temp_password_change_and_me():
         assert login.status_code == 200
         assert login.json()["must_change_password"] is True
         token = login.json()["access_token"]
-        assert client.get("/employees", headers=auth_header(token)).status_code == 403
+        assert client.get("/api/employees", headers=auth_header(token)).status_code == 403
         assert client.get("/auth/me", headers=auth_header(token)).json()["email"] == employee["email"]
         changed = client.post("/auth/change-password", headers=auth_header(token), json={
             "current_password": employee["temporary_password"], "new_password": "NewPass1", "confirm_new_password": "NewPass1",
@@ -100,3 +100,57 @@ def test_employee_temp_password_change_and_me():
         assert changed.json()["must_change_password"] is False
         assert client.post("/auth/login", json={"identifier": employee["login_id"], "password": "NewPass1"}).json()["must_change_password"] is False
         assert client.get("/auth/me").status_code == 401
+
+
+def activate_employee(client: TestClient, employee: dict) -> str:
+    token = client.post("/auth/login", json={"identifier": employee["login_id"], "password": employee["temporary_password"]}).json()["access_token"]
+    response = client.post("/auth/change-password", headers=auth_header(token), json={
+        "current_password": employee["temporary_password"], "new_password": "EmployeePass1", "confirm_new_password": "EmployeePass1",
+    })
+    assert response.status_code == 200
+    return client.post("/auth/login", json={"identifier": employee["email"], "password": "EmployeePass1"}).json()["access_token"]
+
+
+def test_employee_can_edit_only_own_limited_profile_fields():
+    with TestClient(app) as client:
+        signup(client)
+        employee = create_employee(client, admin_token(client)).json()
+        token = activate_employee(client, employee)
+        own = client.put(f"/api/profiles/{employee['id']}", headers=auth_header(token), json={"address": "42 Dayflow Road", "phone": "12345"})
+        forbidden = client.put(f"/api/profiles/{employee['id']}", headers=auth_header(token), json={"bank_name": "Private Bank"})
+    assert own.status_code == 200
+    assert own.json()["address"] == "42 Dayflow Road"
+    assert forbidden.status_code == 403
+
+
+def test_employee_cannot_edit_another_profile_and_admin_can_edit_any_profile():
+    with TestClient(app) as client:
+        signup(client)
+        admin = admin_token(client)
+        first = create_employee(client, admin, "john@example.com").json()
+        second = create_employee(client, admin, "jane@example.com").json()
+        employee_token = activate_employee(client, first)
+        forbidden = client.put(f"/api/profiles/{second['id']}", headers=auth_header(employee_token), json={"address": "No access"})
+        allowed = client.put(f"/api/profiles/{second['id']}", headers=auth_header(admin), json={"address": "Admin updated", "bank_name": "Dayflow Bank"})
+    assert forbidden.status_code == 403
+    assert allowed.status_code == 200
+    assert allowed.json()["bank_name"] == "Dayflow Bank"
+
+
+def test_salary_is_admin_only_and_attendance_toggles_status():
+    with TestClient(app) as client:
+        signup(client)
+        admin = admin_token(client)
+        employee = create_employee(client, admin).json()
+        employee_token = activate_employee(client, employee)
+        saved_salary = client.put(f"/api/profiles/{employee['id']}/salary", headers=auth_header(admin), json={"wage_type": "monthly", "total_wage": "10000", "components": [{"name": "Basic", "kind": "percent", "value": "50"}]})
+        denied_salary = client.get(f"/api/profiles/{employee['id']}/salary", headers=auth_header(employee_token))
+        checked_in = client.post("/api/attendance/check-in", headers=auth_header(employee_token))
+        cards = client.get("/api/employees", headers=auth_header(employee_token)).json()
+        checked_out = client.post("/api/attendance/check-out", headers=auth_header(employee_token))
+    assert saved_salary.status_code == 200
+    assert denied_salary.status_code == 403
+    assert checked_in.status_code == 201
+    assert next(card for card in cards if card["id"] == employee["id"])["status"] == "checked_in"
+    assert checked_out.status_code == 200
+    assert checked_out.json()["check_out_time"] is not None

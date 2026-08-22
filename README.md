@@ -13,6 +13,7 @@ FastAPI, SQLAlchemy 2.0, PostgreSQL, Alembic, JWT, Jinja2, pytest.
 ## Progress
 
 - [x] Phase 1: Foundation, database design, admin-provisioned authentication, and role-based access.
+- [x] Phase 2: Employee directory, profiles, salary access controls, and attendance check-in foundation.
 
 ## Key Design Decisions
 
@@ -20,6 +21,9 @@ FastAPI, SQLAlchemy 2.0, PostgreSQL, Alembic, JWT, Jinja2, pytest.
 - Login IDs use the stored company code, first two letters of each name, year of joining, and a company/year serial (for example, `OIJODO20220001`). The composite company/year/serial constraint prevents collisions.
 - There is no email-verification flow. Since all employee accounts are created by an authenticated administrator rather than an untrusted party, this keeps onboarding lean for the initial release.
 - Passwords are bcrypt hashes. JWT payloads contain only user ID, role, and expiry. Deactivation is a soft delete using `is_active`.
+- Employee profile, salary structure, attendance, and leave-status records are separate tables keyed to `User`. This keeps the authentication identity stable for later phases.
+- Salary APIs are admin-only as well as hidden in the interface. Employees can update only their own address, phone, and profile picture; all other profile edits require an admin.
+- Attendance has one record per employee per day. An open record renders a green status, an approved leave renders an airplane indicator, and otherwise the employee is shown as absent.
 
 ## Setup
 
@@ -42,4 +46,4 @@ Set `DATABASE_URL` in `.env` to a PostgreSQL connection string before production
 pytest
 ```
 
-The test suite uses an isolated in-memory SQLite database and covers signup, ID generation, role enforcement, temporary-password login, mandatory password change, and authenticated profile access.
+The test suite uses an isolated in-memory SQLite database and covers signup, ID generation, role enforcement, temporary-password login, mandatory password change, profile edit controls, salary privacy, and attendance toggling.
