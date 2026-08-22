@@ -1,38 +1,35 @@
 # Dayflow — Human Resource Management System
 
-Repo: https://github.com/safwanxs/SAFWAN-ODOOXNMIT
+**Live demo:** https://dayflow-hrms-jq5c.onrender.com
+**Demo admin login:** `alex.rao@dayflowdemo.com` / `AdminPass123!`
 
-## Problem statement and approach
+Dayflow centralizes employee identity, attendance, leave, and payroll workflows in one HRMS application. It is built for fast operational visibility with role-based employee self-service and an administrator workspace.
 
-HR teams commonly manage employee identity, attendance, leave, and payroll in separate tools. Dayflow brings those workflows into one FastAPI application: administrator-provisioned accounts, employee self-service, attendance reporting, leave approval, and an attendance-linked payroll preview.
+## Features
+
+- **Admin-provisioned authentication:** System-generated login IDs, JWT-backed sessions, and mandatory password change for provisioned employees.
+- **Employee directory and profiles:** Searchable employee cards, role-aware profile access, salary privacy, and profile-picture upload for employees and administrators.
+- **Attendance:** Check in/out actions with daily administrative reporting and employee monthly attendance views.
+- **Leave and time off:** Employees request paid, sick, or unpaid leave; administrators approve or reject with comments; allocations update on approval.
+- **Payroll preview — core differentiator:** Calculates payable days from attendance, public holidays, approved leave, and missing attendance. It prorates payroll and shows salary components, employee/employer PF, and professional tax.
+- **Analytics dashboard:** Live headcount, check-in, attendance rate, pending-leave, and payroll-readiness metrics with Chart.js visualization.
+- **Demo data seeder:** A deterministic Faker-powered script creates a demo company, admin, configurable employee set, profiles, salary structures, attendance, leave activity, and credentials.
 
 ## Stack
 
-FastAPI, SQLAlchemy 2.0, Alembic, PostgreSQL (production), SQLite (local development), JWT, Pydantic v2, Jinja2, Chart.js, and pytest.
-
-## Progress
-
-- [x] Phase 1: Foundation, database design, admin-provisioned authentication, and role-based access
-- [x] Phase 2: Employee directory, profiles, salary access controls, and attendance
-- [x] Phase 3: Role-specific attendance reporting with server-computed hours
-- [x] Phase 4: Leave and time-off management, allocations, approvals, certificates, and attendance integration
-- [x] Phase 5: Attendance-linked payroll engine, analytics dashboard, final validation, and deployment configuration
+FastAPI, SQLAlchemy 2.0, Alembic, PostgreSQL (production), SQLite (local development), JWT, Pydantic v2, Jinja2, Chart.js, and pytest. `faker` is included as a development/demo dependency for `seed_demo_data.py`; it is not required by the web service at runtime.
 
 ## Database design choices
 
-- `users` has unique indexed email and login ID fields plus a composite company/year/serial constraint for generated employee IDs. Accounts are soft-deleted with `is_active`.
-- Attendance is constrained to one record per user per date. Leave allocation is unique per employee and leave type, preventing duplicate allocation rows.
-- Salary structures, employee profiles, leave requests, and attendance remain separate from authentication identity records. This keeps sensitive salary data behind admin-only APIs.
-
-## Differentiator: payroll readiness preview
-
-The payroll preview is calculated from real data, not manually entered payable days. It excludes public holidays, subtracts approved unpaid leave and missing attendance, includes approved paid/sick leave, prorates pay, and shows PF and professional-tax deductions. Employees can view only their own preview; administrators can review any employee's.
+- `users` has unique indexed email and login ID fields plus a composite company/year/serial constraint for generated employee IDs. Accounts use soft deletion through `is_active`.
+- Attendance is constrained to one record per employee and date. Leave allocations are unique per employee and leave type.
+- Employee profiles, salary structures, attendance, and leave requests are separate tables keyed to the base `User` identity, keeping salary information behind admin-only endpoints.
 
 ## Security
 
-Employees are provisioned by an administrator and must change their one-time temporary password on first login. Passwords are bcrypt hashed; JWTs contain only identity/role/expiry. ORM queries are parameterized—there is no raw SQL string formatting. `.env` is ignored, and login injection input such as `' OR 1=1` is rejected as an invalid identifier/password.
+Employees are provisioned by administrators, receive a one-time temporary password, and must change it before app access. Passwords are bcrypt hashed; JWTs contain only identity, role, and expiry. ORM queries are parameterized, `.env` is ignored, and invalid login input such as `' OR 1=1` is rejected.
 
-## Setup
+## Local setup
 
 ```bash
 git clone https://github.com/safwanxs/SAFWAN-ODOOXNMIT.git
@@ -45,14 +42,23 @@ alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
-Set `DATABASE_URL` to PostgreSQL and a strong `SECRET_KEY` for deployment.
+Set `DATABASE_URL` to a PostgreSQL connection string and provide a strong `SECRET_KEY` for production.
 
-## Deploy
+### Seed demo data
 
-`render.yaml` configures a Render web service. Create a Render PostgreSQL database, set its connection string as `DATABASE_URL`, then deploy the repository. The build command runs `alembic upgrade head` and the start command launches Uvicorn.
+Run only against a clean database:
 
-- Live link: pending deployment (requires the project owner's Render/Railway account)
-- Demo video: pending recording (requires a deployed public link)
+```bash
+DATABASE_URL="sqlite:///./dayflow.db" python seed_demo_data.py
+```
+
+The default creates 25 employees. Set `SEED_EMPLOYEE_COUNT` (3–100) for a different amount. For more than 15 employees, credentials are also written to `seed_credentials.txt`.
+
+## Deployment
+
+The live service is deployed on Render: https://dayflow-hrms-jq5c.onrender.com
+
+`render.yaml` installs dependencies, runs `alembic upgrade head`, and starts Uvicorn. Configure `DATABASE_URL` with the Render PostgreSQL connection string and `SECRET_KEY` in Render environment variables.
 
 ## Verification
 
@@ -60,6 +66,9 @@ Set `DATABASE_URL` to PostgreSQL and a strong `SECRET_KEY` for deployment.
 pytest -q
 ```
 
-## Honest limitation
+## Known Limitations
 
-Payroll is an on-demand calculation preview; this hackathon version does not yet create immutable payroll-run records, support statutory rules for every jurisdiction, or send payslips.
+- Only profile pictures can be uploaded. The app does not provide a general document repository for resumes, certificates, or identity proofs.
+- Credentials and workflow notifications are not delivered by email; employees see relevant state only within the app.
+- Payroll is an on-demand preview rather than an immutable payroll-run system; it does not generate payslips or cover statutory rules for every jurisdiction.
+- The application does not currently include CSV export of payroll-ready employees.
