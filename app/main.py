@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app.core.dependencies import require_password_changed
-from app.routers import admin, attendance, auth, employees, profiles
+from app.routers import admin, attendance, attendance_reports, auth, employees, profiles
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
@@ -19,6 +19,7 @@ app.include_router(admin.router)
 app.include_router(employees.router)
 app.include_router(profiles.router)
 app.include_router(attendance.router)
+app.include_router(attendance_reports.router)
 
 
 @app.exception_handler(HTTPException)
@@ -51,9 +52,9 @@ def profile_page(request: Request, user_id: int):
     return templates.TemplateResponse(request, "profile.html", {"user_id": user_id})
 
 
-@app.get("/attendance", response_class=HTMLResponse)
+@app.get("/attendance/view", response_class=HTMLResponse)
 def attendance_page(request: Request):
-    return templates.TemplateResponse(request, "feature_placeholder.html", {"title": "Attendance"})
+    return templates.TemplateResponse(request, "attendance.html")
 
 
 @app.get("/time-off", response_class=HTMLResponse)

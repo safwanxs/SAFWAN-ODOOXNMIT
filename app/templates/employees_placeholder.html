@@ -1,6 +1,6 @@
 <!doctype html>
 <html><body>
-<nav><a href="/employees">Employees</a> | <a href="/attendance">Attendance</a> | <a href="/time-off">Time Off</a><span style="float:right"><button id="check">Check In</button> <button id="profile">My Profile</button> <button id="logout">Log Out</button></span></nav>
+<nav><a href="/employees">Employees</a> | <a href="/attendance/view">Attendance</a> | <a href="/time-off">Time Off</a><span style="float:right"><button id="check">Check In</button> <button id="profile">My Profile</button> <button id="logout">Log Out</button></span></nav>
 <h1>Employees</h1><input id="search" placeholder="Search employees"><div id="cards"></div>
 <script>
 const token=localStorage.token,headers={'Authorization':'Bearer '+token};let me;
