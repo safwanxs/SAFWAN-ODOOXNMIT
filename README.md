@@ -14,6 +14,7 @@ FastAPI, SQLAlchemy 2.0, PostgreSQL, Alembic, JWT, Jinja2, pytest.
 
 - [x] Phase 1: Foundation, database design, admin-provisioned authentication, and role-based access.
 - [x] Phase 2: Employee directory, profiles, salary access controls, and attendance check-in foundation.
+- [x] Phase 3: Role-specific attendance reporting with server-computed work and extra hours.
 
 ## Key Design Decisions
 
@@ -24,6 +25,7 @@ FastAPI, SQLAlchemy 2.0, PostgreSQL, Alembic, JWT, Jinja2, pytest.
 - Employee profile, salary structure, attendance, and leave-status records are separate tables keyed to `User`. This keeps the authentication identity stable for later phases.
 - Salary APIs are admin-only as well as hidden in the interface. Employees can update only their own address, phone, and profile picture; all other profile edits require an admin.
 - Attendance has one record per employee per day. An open record renders a green status, an approved leave renders an airplane indicator, and otherwise the employee is shown as absent.
+- Phase 3 extends that attendance record rather than replacing it. Reports compute work and extra hours from stored check-in/out timestamps, never client input. Approved Time Off lookup is intentionally marked as a Phase 4 integration point; until then no-record days report as absent.
 
 ## Setup
 
@@ -46,4 +48,4 @@ Set `DATABASE_URL` in `.env` to a PostgreSQL connection string before production
 pytest
 ```
 
-The test suite uses an isolated in-memory SQLite database and covers signup, ID generation, role enforcement, temporary-password login, mandatory password change, profile edit controls, salary privacy, and attendance toggling.
+The test suite uses an isolated in-memory SQLite database and covers signup, ID generation, role enforcement, temporary-password login, mandatory password change, profile edit controls, salary privacy, attendance toggling, reporting visibility, attendance-hour calculations, and absent-day reporting.

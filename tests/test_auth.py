@@ -1,3 +1,5 @@
+from datetime import date, datetime, timezone
+
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -5,6 +7,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
 from app.main import app
+from app.models.attendance import Attendance
 
 engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -154,3 +157,49 @@ def test_salary_is_admin_only_and_attendance_toggles_status():
     assert next(card for card in cards if card["id"] == employee["id"])["status"] == "checked_in"
     assert checked_out.status_code == 200
     assert checked_out.json()["check_out_time"] is not None
+
+
+def test_employee_attendance_is_limited_to_own_month_data_and_hours_are_server_computed():
+    with TestClient(app) as client:
+        signup(client)
+        admin = admin_token(client)
+        employee = create_employee(client, admin, "john@example.com").json()
+        other = create_employee(client, admin, "jane@example.com").json()
+        employee_token = activate_employee(client, employee)
+        other_token = activate_employee(client, other)
+        day = date(2026, 3, 5)
+        db = TestingSessionLocal()
+        db.add_all([
+            Attendance(user_id=employee["id"], date=day, check_in_time=datetime(2026, 3, 5, 9, tzinfo=timezone.utc), check_out_time=datetime(2026, 3, 5, 19, 15, tzinfo=timezone.utc)),
+            Attendance(user_id=other["id"], date=day, check_in_time=datetime(2026, 3, 5, 10, tzinfo=timezone.utc), check_out_time=datetime(2026, 3, 5, 11, tzinfo=timezone.utc)),
+        ])
+        db.commit()
+        db.close()
+        own = client.get("/attendance/me?month=3&year=2026", headers=auth_header(employee_token))
+        employee_admin_report = client.get("/attendance?date=2026-03-05", headers=auth_header(employee_token))
+    assert own.status_code == 200
+    assert len(own.json()["attendance"]) == 1
+    assert own.json()["attendance"][0]["user_id"] == employee["id"]
+    assert own.json()["attendance"][0]["work_hours"] == 10.25
+    assert own.json()["attendance"][0]["extra_hours"] == 2.25
+    assert employee_admin_report.status_code == 403
+
+
+def test_admin_day_attendance_includes_records_and_absences():
+    with TestClient(app) as client:
+        signup(client)
+        admin = admin_token(client)
+        employee = create_employee(client, admin, "john@example.com").json()
+        absent_employee = create_employee(client, admin, "jane@example.com").json()
+        day = date(2026, 4, 6)
+        db = TestingSessionLocal()
+        db.add(Attendance(user_id=employee["id"], date=day, check_in_time=datetime(2026, 4, 6, 9, tzinfo=timezone.utc), check_out_time=datetime(2026, 4, 6, 17, tzinfo=timezone.utc)))
+        db.commit()
+        db.close()
+        report = client.get("/attendance?date=2026-04-06&display_mode=day", headers=auth_header(admin))
+    assert report.status_code == 200
+    rows = {row["user_id"]: row for row in report.json()["attendance"]}
+    assert rows[employee["id"]]["status"] == "Present"
+    assert rows[employee["id"]]["work_hours"] == 8.0
+    assert rows[absent_employee["id"]]["status"] == "Absent"
+    assert rows[absent_employee["id"]]["check_in_time"] is None
