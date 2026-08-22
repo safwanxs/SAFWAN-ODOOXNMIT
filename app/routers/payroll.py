@@ -1,13 +1,13 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import require_password_changed, require_role
 from app.database import get_db
 from app.models.user import User
 from app.schemas.payroll import PayrollPreviewResponse
-from app.services.payroll import build_payroll_preview
+from app.services.payroll import build_company_payroll_csv, build_payroll_preview
 
 router = APIRouter(prefix="/api/payroll", tags=["payroll"])
 
@@ -26,6 +26,21 @@ def my_payroll(
     current_user: User = Depends(require_password_changed), db: Session = Depends(get_db),
 ) -> PayrollPreviewResponse:
     return preview_or_404(db, current_user, month, year)
+
+
+@router.get("/export")
+def export_company_payroll(
+    month: int = Query(default_factory=lambda: date.today().month, ge=1, le=12),
+    year: int = Query(default_factory=lambda: date.today().year, ge=2000, le=2100),
+    admin: User = Depends(require_role("admin")), db: Session = Depends(get_db),
+) -> Response:
+    csv_data = build_company_payroll_csv(db, admin.company_id, month, year)
+    filename = f"payroll_{year}_{month:02d}.csv"
+    return Response(
+        content=csv_data,
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/{user_id}", response_model=PayrollPreviewResponse)

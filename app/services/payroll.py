@@ -1,3 +1,5 @@
+import csv
+import io
 from calendar import monthrange
 from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
@@ -72,3 +74,47 @@ def build_payroll_preview(db: Session, user: User, month: int, year: int) -> Pay
         provident_fund_employee=employee_pf, provident_fund_employer=employer_pf,
         professional_tax=professional_tax, total_deductions=deductions, net_pay=money(gross_pay - deductions),
     )
+
+
+def build_company_payroll_csv(db: Session, company_id: int, month: int, year: int) -> str:
+    users = db.scalars(
+        select(User).where(User.company_id == company_id, User.is_active == True).order_by(User.id)
+    ).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "Employee ID", "Employee Name", "Work Email", "Month", "Year",
+        "Total Working Days", "Present Days", "Paid Leave Days", "Unpaid Leave Days",
+        "Missing Days", "Payable Days", "Monthly Wage", "Gross Pay",
+        "Employee PF", "Employer PF", "Professional Tax", "Total Deductions", "Net Pay"
+    ])
+
+    for user in users:
+        try:
+            preview = build_payroll_preview(db, user, month, year)
+            writer.writerow([
+                user.login_id,
+                f"{user.first_name} {user.last_name}",
+                user.email,
+                month,
+                year,
+                preview.total_working_days,
+                preview.present_days,
+                preview.paid_leave_days,
+                preview.unpaid_leave_days,
+                preview.missing_attendance_days,
+                preview.payable_days,
+                str(preview.monthly_wage),
+                str(preview.gross_pay),
+                str(preview.provident_fund_employee),
+                str(preview.provident_fund_employer),
+                str(preview.professional_tax),
+                str(preview.total_deductions),
+                str(preview.net_pay),
+            ])
+        except ValueError:
+            # User does not have salary structure configured
+            continue
+
+    return output.getvalue()

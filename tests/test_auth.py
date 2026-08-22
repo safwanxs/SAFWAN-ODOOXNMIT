@@ -374,3 +374,33 @@ def test_profile_picture_upload_allows_owner_and_rejects_bad_types_and_other_emp
     assert "JPEG, PNG, or WebP" in invalid_type.json()["detail"]
     assert forbidden.status_code == 403
     assert admin_uploaded.status_code == 200
+
+
+def test_admin_export_payroll_csv_and_employee_forbidden():
+    with TestClient(app) as client:
+        signup(client)
+        admin = admin_token(client)
+        employee = create_employee(client, admin).json()
+        employee_token = activate_employee(client, employee)
+        
+        # Configure salary for employee
+        client.put(
+            f"/api/profiles/{employee['id']}/salary",
+            headers=auth_header(admin),
+            json={"wage_type": "monthly", "total_wage": "12000", "components": [{"name": "Basic", "kind": "percent", "value": "50"}]}
+        )
+
+        # Employee cannot export payroll CSV
+        forbidden = client.get("/api/payroll/export?month=6&year=2026", headers=auth_header(employee_token))
+
+        # Admin can export payroll CSV
+        export = client.get("/api/payroll/export?month=6&year=2026", headers=auth_header(admin))
+
+    assert forbidden.status_code == 403
+    assert export.status_code == 200
+    assert export.headers["content-type"].startswith("text/csv")
+    assert "attachment; filename=\"payroll_2026_06.csv\"" in export.headers["content-disposition"]
+    csv_text = export.text
+    assert "Employee ID" in csv_text
+    assert "Net Pay" in csv_text
+    assert employee["email"] in csv_text

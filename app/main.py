@@ -47,7 +47,8 @@ def change_password_page(request: Request):
 
 @app.get("/employees", response_class=HTMLResponse)
 def employees_page(request: Request):
-    return templates.TemplateResponse(request, "employees_placeholder.html")
+    return templates.TemplateResponse(request, "employees.html")
+
 
 
 @app.get("/profile/{user_id}", response_class=HTMLResponse)
