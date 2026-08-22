@@ -404,3 +404,29 @@ def test_admin_export_payroll_csv_and_employee_forbidden():
     assert "Employee ID" in csv_text
     assert "Net Pay" in csv_text
     assert employee["email"] in csv_text
+
+
+def test_export_employees_csv_non_admin_forbidden():
+    with TestClient(app) as client:
+        signup(client)
+        admin = admin_token(client)
+        employee = create_employee(client, admin).json()
+        employee_token = activate_employee(client, employee)
+        res = client.get("/api/employees/export", headers=auth_header(employee_token))
+    assert res.status_code == 403
+
+
+def test_export_employees_csv_admin_success():
+    with TestClient(app) as client:
+        signup(client)
+        admin = admin_token(client)
+        employee = create_employee(client, admin).json()
+        client.put(
+            f"/api/profiles/{employee['id']}/salary",
+            headers=auth_header(admin),
+            json={"wage_type": "monthly", "total_wage": "10000", "components": []},
+        )
+        res = client.get("/api/employees/export", headers=auth_header(admin))
+    assert res.status_code == 200
+    assert res.headers["content-type"].startswith("text/csv")
+    assert employee["login_id"] in res.text

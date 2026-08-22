@@ -1,14 +1,19 @@
+import csv
+import io
 from datetime import date
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import require_password_changed
+from app.core.dependencies import require_password_changed, require_role
 from app.database import get_db
 from app.models.attendance import Attendance
 from app.models.employee_profile import EmployeeProfile
 from app.models.leave_request import LeaveRequest
+from app.models.salary_structure import SalaryStructure
 from app.models.user import User
 from app.schemas.employee import EmployeeCard
 
@@ -30,3 +35,49 @@ def list_employees(
     checked_in = set(db.scalars(select(Attendance.user_id).where(Attendance.date == today, Attendance.check_out_time.is_(None))).all())
     on_leave = set(db.scalars(select(LeaveRequest.user_id).where(LeaveRequest.status == "approved", LeaveRequest.start_date <= today, LeaveRequest.end_date >= today)).all())
     return [EmployeeCard(id=user.id, first_name=user.first_name, last_name=user.last_name, role=user.role, profile_picture_url=picture, status=("on_leave" if user.id in on_leave else "checked_in" if user.id in checked_in else "absent")) for user, picture in users]
+
+
+@router.get("/export")
+def export_payroll_employees(
+    admin: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+    query = (
+        select(User, SalaryStructure)
+        .join(SalaryStructure, SalaryStructure.user_id == User.id)
+        .where(User.company_id == admin.company_id, User.is_active.is_(True))
+        .order_by(User.id)
+    )
+    results = db.execute(query).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["login_id", "first_name", "last_name", "role", "month_wage", "yearly_wage", "email"])
+
+    for user, salary in results:
+        defined_wage = Decimal(salary.total_wage)
+        if salary.wage_type == "monthly":
+            month_wage = defined_wage
+            yearly_wage = defined_wage * Decimal("12")
+        else:
+            month_wage = defined_wage / Decimal("12")
+            yearly_wage = defined_wage
+
+        role_str = user.role.value if hasattr(user.role, "value") else str(user.role)
+        writer.writerow([
+            user.login_id,
+            user.first_name,
+            user.last_name,
+            role_str,
+            str(month_wage),
+            str(yearly_wage),
+            user.email,
+        ])
+
+    filename = f"dayflow-payroll-employees-{date.today().isoformat()}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
