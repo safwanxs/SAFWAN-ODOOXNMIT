@@ -45,9 +45,20 @@ def login_page(request: Request):
     return templates.TemplateResponse(request, "login.html")
 
 
+@app.get("/register", response_class=HTMLResponse)
+def register_page(request: Request):
+    return templates.TemplateResponse(request, "register.html")
+
+
+@app.get("/verify-email", response_class=HTMLResponse)
+def verify_email_page(request: Request):
+    return templates.TemplateResponse(request, "verify_email.html")
+
+
 @app.get("/about", response_class=HTMLResponse)
 def about_page(request: Request):
     return templates.TemplateResponse(request, "about.html")
+
 
 
 

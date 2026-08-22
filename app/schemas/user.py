@@ -28,9 +28,12 @@ class UserResponse(BaseModel):
     email: EmailStr
     role: UserRole
     must_change_password: bool
+    email_verified: bool = False
+    hr_approval_status: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
 
 
 class EmployeeCreated(UserResponse):
@@ -60,4 +63,24 @@ class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
     must_change_password: bool
+
+
+class EmployeeSelfRegister(BaseModel):
+    first_name: str = Field(min_length=1, max_length=100)
+    last_name: str = Field(min_length=1, max_length=100)
+    email: EmailStr
+    password: str = Field(min_length=8)
+    confirm_password: str
+    role: str
+
+    @model_validator(mode="after")
+    def validate_registration(self):
+        if self.role not in ("employee", "hr"):
+            raise ValueError("Role must be 'employee' or 'hr'")
+        if self.password != self.confirm_password:
+            raise ValueError("Passwords do not match")
+        if not any(char.isupper() for char in self.password) or not any(char.isdigit() for char in self.password):
+            raise ValueError("Password must contain an uppercase letter and a digit")
+        return self
+
 

@@ -30,6 +30,7 @@ def create_employee(payload: EmployeeCreate, admin: User = Depends(require_role(
         hashed_password=hash_password(temp_password),
         role=UserRole.EMPLOYEE,
         must_change_password=True,
+        email_verified=True,
         year_of_joining=payload.year_of_joining,
         serial_number=serial,
         company_id=company.id,
@@ -42,3 +43,54 @@ def create_employee(payload: EmployeeCreate, admin: User = Depends(require_role(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Unable to provision employee")
     db.refresh(employee)
     return EmployeeCreated(**UserResponse.model_validate(employee, from_attributes=True).model_dump(), temporary_password=temp_password)
+
+
+@router.get("/hr-requests", response_model=list[UserResponse])
+def list_hr_requests(admin: User = Depends(require_role("admin")), db: Session = Depends(get_db)):
+    users = db.scalars(
+        select(User).where(
+            User.company_id == admin.company_id,
+            User.hr_approval_status == "pending",
+        )
+    ).all()
+    return users
+
+
+@router.post("/hr-requests/{user_id}/approve", response_model=UserResponse)
+def approve_hr_request(user_id: int, admin: User = Depends(require_role("admin")), db: Session = Depends(get_db)):
+    user = db.scalar(
+        select(User).where(
+            User.id == user_id,
+            User.company_id == admin.company_id,
+            User.hr_approval_status == "pending",
+        )
+    )
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="HR request not found")
+
+    user.hr_approval_status = "approved"
+    # Approved HR receives elevated admin-level access as the application role model does not have a separate HR enum tier
+    user.role = UserRole.ADMIN
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.post("/hr-requests/{user_id}/reject", response_model=UserResponse)
+def reject_hr_request(user_id: int, admin: User = Depends(require_role("admin")), db: Session = Depends(get_db)):
+    user = db.scalar(
+        select(User).where(
+            User.id == user_id,
+            User.company_id == admin.company_id,
+            User.hr_approval_status == "pending",
+        )
+    )
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="HR request not found")
+
+    user.hr_approval_status = "rejected"
+    user.role = UserRole.EMPLOYEE
+    db.commit()
+    db.refresh(user)
+    return user
+

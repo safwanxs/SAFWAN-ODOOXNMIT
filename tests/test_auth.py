@@ -430,3 +430,99 @@ def test_export_employees_csv_admin_success():
     assert res.status_code == 200
     assert res.headers["content-type"].startswith("text/csv")
     assert employee["login_id"] in res.text
+
+
+def test_self_register_weak_password_rejected():
+    with TestClient(app) as client:
+        signup(client)
+        res = client.post("/auth/register", json={
+            "first_name": "Sam", "last_name": "Smith", "email": "sam@example.com",
+            "password": "weak", "confirm_password": "weak", "role": "employee",
+        })
+    assert res.status_code == 422
+
+
+def test_self_register_employee_unverified_login_blocked():
+    with TestClient(app) as client:
+        signup(client)
+        reg = client.post("/auth/register", json={
+            "first_name": "Sam", "last_name": "Smith", "email": "sam@example.com",
+            "password": "Password123", "confirm_password": "Password123", "role": "employee",
+        })
+        assert reg.status_code == 201
+        login_res = client.post("/auth/login", json={"identifier": "sam@example.com", "password": "Password123"})
+    assert login_res.status_code == 403
+
+
+def test_self_register_email_verification_allows_login():
+    with TestClient(app) as client:
+        signup(client)
+        client.post("/auth/register", json={
+            "first_name": "Sam", "last_name": "Smith", "email": "sam@example.com",
+            "password": "Password123", "confirm_password": "Password123", "role": "employee",
+        })
+        db = TestingSessionLocal()
+        from app.models.email_verification_token import EmailVerificationToken
+        token_row = db.query(EmailVerificationToken).first()
+        token_str = token_row.token
+        db.close()
+
+        verify_res = client.get(f"/auth/verify-email?token={token_str}")
+        assert verify_res.status_code == 200
+
+        login_res = client.post("/auth/login", json={"identifier": "sam@example.com", "password": "Password123"})
+        assert login_res.status_code == 200
+        assert "access_token" in login_res.json()
+
+
+def test_self_register_hr_request_workflow():
+    with TestClient(app) as client:
+        signup(client)
+        admin = admin_token(client)
+        client.post("/auth/register", json={
+            "first_name": "Helen", "last_name": "Ross", "email": "helen@example.com",
+            "password": "Password123", "confirm_password": "Password123", "role": "hr",
+        })
+        db = TestingSessionLocal()
+        from app.models.email_verification_token import EmailVerificationToken
+        from app.models.user import User
+        token_row = db.query(EmailVerificationToken).first()
+        token_str = token_row.token
+        hr_user = db.query(User).filter(User.email == "helen@example.com").first()
+        hr_user_id = hr_user.id
+        db.close()
+
+        client.get(f"/auth/verify-email?token={token_str}")
+        hr_token = client.post("/auth/login", json={"identifier": "helen@example.com", "password": "Password123"}).json()["access_token"]
+
+        forbidden_reqs = client.get("/admin/hr-requests", headers=auth_header(hr_token))
+        assert forbidden_reqs.status_code == 403
+
+        admin_reqs = client.get("/admin/hr-requests", headers=auth_header(admin))
+        assert admin_reqs.status_code == 200
+        assert any(r["id"] == hr_user_id for r in admin_reqs.json())
+
+        approve_res = client.post(f"/admin/hr-requests/{hr_user_id}/approve", headers=auth_header(admin))
+        assert approve_res.status_code == 200
+        assert approve_res.json()["role"] == "admin"
+        assert approve_res.json()["hr_approval_status"] == "approved"
+
+
+def test_self_register_hr_request_reject():
+    with TestClient(app) as client:
+        signup(client)
+        admin = admin_token(client)
+        client.post("/auth/register", json={
+            "first_name": "Helen", "last_name": "Ross", "email": "helen@example.com",
+            "password": "Password123", "confirm_password": "Password123", "role": "hr",
+        })
+        db = TestingSessionLocal()
+        from app.models.user import User
+        hr_user = db.query(User).filter(User.email == "helen@example.com").first()
+        hr_user_id = hr_user.id
+        db.close()
+
+        reject_res = client.post(f"/admin/hr-requests/{hr_user_id}/reject", headers=auth_header(admin))
+        assert reject_res.status_code == 200
+        assert reject_res.json()["role"] == "employee"
+        assert reject_res.json()["hr_approval_status"] == "rejected"
