@@ -1,9 +1,9 @@
 {% extends "base.html" %}{% block content %}
 <p class="eyebrow">Your team</p><h1>Employees</h1><div class="controls"><input id="search" placeholder="Search employees"><button id="check">Check In</button><button id="profile">My Profile</button><button id="logout">Log Out</button></div><p id="state" class="message">Loading employees…</p><div id="cards"></div>
 <script>
-const token=localStorage.token,headers={'Authorization':'Bearer '+token};let me;
+const token=localStorage.token,headers={'Authorization':'Bearer '+token};let me;function detailText(d){return Array.isArray(d.detail)?d.detail.map(x=>x.msg||JSON.stringify(x)).join('; '):(d.detail||'Something went wrong.')}
 async function api(url,options={}){let r=await fetch(url,{...options,headers:{...headers,...(options.headers||{})}});if(r.status===401||r.status===403){location='/change-password';throw Error('Not authorized')}return r}
 async function load(){let m=await api('/auth/me');me=await m.json();let r=await api('/api/employees?search='+encodeURIComponent(search.value));let people=await r.json();state.textContent=people.length?'':'No employees found.';cards.innerHTML=people.map(p=>`<article><a href="/profile/${p.id}"><img src="${p.profile_picture_url||'https://placehold.co/48'}" width="48" height="48"><b>${p.first_name} ${p.last_name}</b></a> <span title="${p.status}">${p.status==='checked_in'?'🟢':p.status==='on_leave'?'✈️':'🟡'}</span></article>`).join('');profile.onclick=()=>location='/profile/'+me.id;let self=people.find(p=>p.id===me.id);check.textContent=self?.status==='checked_in'?'Check Out':'Check In'}
-check.onclick=async()=>{let endpoint=check.textContent==='Check In'?'/api/attendance/check-in':'/api/attendance/check-out';let r=await api(endpoint,{method:'POST'});if(!r.ok)alert((await r.json()).detail);load()}}
+check.onclick=async()=>{let endpoint=check.textContent==='Check In'?'/api/attendance/check-in':'/api/attendance/check-out';let r=await api(endpoint,{method:'POST'});if(!r.ok)alert(detailText(await r.json()));load()}}
 search.oninput=load;logout.onclick=()=>{localStorage.removeItem('token');location='/login'};load();
 </script>{% endblock %}
