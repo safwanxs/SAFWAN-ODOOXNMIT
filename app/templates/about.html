@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}About — Dayflow{% endblock %}
+{% block content %}
+<p class="eyebrow">Hackathon Overview</p>
+<h1>Dayflow — Human Resource Management System</h1>
+<p class="muted">Centralized employee identity, attendance, leave, and payroll workflows in one HRMS application.</p>
+
+<div style="display:grid;gap:20px;margin-top:24px">
+  <section>
+    <h2>What it does</h2>
+    <p>Dayflow centralizes employee identity, attendance, leave, and payroll workflows in a single web application built for fast operational visibility. It features admin-provisioned authentication, a searchable employee directory with role-aware profile access, check in/out attendance tracking, structured leave request approvals, and an analytics dashboard with Chart.js visualization.</p>
+  </section>
+
+  <section>
+    <h2>Core Differentiator</h2>
+    <p>The payroll preview dynamically calculates payable days from real attendance records, public holidays, approved leave, and missing attendance. It prorates payroll and displays transparent component breakdowns including basic pay, allowances, employee and employer Provident Fund (PF), and professional tax.</p>
+  </section>
+
+  <section>
+    <h2>Tech Stack</h2>
+    <p>Built with <b>FastAPI</b>, <b>SQLAlchemy 2.0</b>, <b>Alembic</b>, <b>PostgreSQL</b> (production), <b>SQLite</b> (local development), <b>JWT</b>, <b>Pydantic v2</b>, <b>Jinja2</b>, <b>Chart.js</b>, and <b>pytest</b>.</p>
+  </section>
+
+  <section>
+    <h2>Try It Live</h2>
+    <p>This is a live demo application pre-populated with seeded demo company, employee, attendance, and payroll data.</p>
+    <p style="margin-top:12px"><a href="/login" class="nav-login" style="display:inline-block">Go to Sign in</a></p>
+  </section>
+
+  <section>
+    <h2>Source Code</h2>
+    <p>Explore the project repository, architecture details, and full documentation on GitHub:</p>
+    <p><a href="https://github.com/safwanxs/SAFWAN-ODOOXNMIT" target="_blank" rel="noopener noreferrer" style="color:var(--purple);font-weight:600;text-decoration:underline">https://github.com/safwanxs/SAFWAN-ODOOXNMIT</a></p>
+  </section>
+</div>
+{% endblock %}

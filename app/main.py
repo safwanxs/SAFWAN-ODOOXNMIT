@@ -40,6 +40,12 @@ def login_page(request: Request):
     return templates.TemplateResponse(request, "login.html")
 
 
+@app.get("/about", response_class=HTMLResponse)
+def about_page(request: Request):
+    return templates.TemplateResponse(request, "about.html")
+
+
+
 @app.get("/change-password", response_class=HTMLResponse)
 def change_password_page(request: Request):
     return templates.TemplateResponse(request, "change_password.html")
