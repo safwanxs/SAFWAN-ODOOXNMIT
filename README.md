@@ -47,13 +47,22 @@ Set `DATABASE_URL` to a PostgreSQL connection string and provide a strong `SECRE
 
 ### Seed demo data
 
-Run only against a clean database:
+Run against a database:
 
 ```bash
 DATABASE_URL="sqlite:///./dayflow.db" python seed_demo_data.py
 ```
 
 The default creates 25 employees. Set `SEED_EMPLOYEE_COUNT` (3–100) for a different amount. For more than 15 employees, credentials are also written to `seed_credentials.txt`.
+
+To re-seed a database that already contains company data, set `SEED_RESET=true` (or `"1"`):
+
+```bash
+SEED_RESET=true python seed_demo_data.py
+```
+
+> **Warning:** Setting `SEED_RESET=true` permanently deletes all existing company data, users, profiles, attendance records, leave requests, and salary structures before re-seeding.
+
 
 ### Demo credentials
 

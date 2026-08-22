@@ -14,6 +14,8 @@ from random import Random
 
 from faker import Faker
 
+from sqlalchemy import delete
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from app.database import Base, engine, SessionLocal  # noqa: E402
@@ -32,7 +34,9 @@ ADMIN_PASSWORD = "AdminPass123!"
 COMPANY_CODE = "DF"
 YEAR = date.today().year
 NUM_EMPLOYEES = int(os.environ.get("SEED_EMPLOYEE_COUNT", "25"))
+SEED_RESET = os.environ.get("SEED_RESET", "").strip().lower() in ("1", "true")
 MAX_EMPLOYEES = 100
+
 
 # Keep demo data reproducible. Remove these seeds for genuinely random demo data.
 Faker.seed(42)
@@ -85,9 +89,24 @@ db = SessionLocal()
 credentials_log: list[tuple[str, str, str, str]] = []
 
 try:
-    if db.query(Company).first():
-        print("A Company already exists — refusing to reseed. Wipe the DB first if you want a clean seed.")
-        sys.exit(1)
+    existing_companies = db.query(Company).count()
+    existing_users = db.query(User).count()
+    if existing_companies > 0:
+        if not SEED_RESET:
+            print("A Company already exists — refusing to reseed. Wipe the DB first if you want a clean seed.")
+            sys.exit(1)
+        print(f"Found {existing_companies} existing company/companies and {existing_users} user(s).")
+        print("SEED_RESET=true: deleting all existing data and re-seeding.")
+        db.execute(delete(LeaveRequest))
+        db.execute(delete(LeaveAllocation))
+        db.execute(delete(Attendance))
+        db.execute(delete(SalaryStructure))
+        db.execute(delete(EmployeeProfile))
+        db.execute(delete(PublicHoliday))
+        db.execute(delete(User))
+        db.execute(delete(Company))
+        db.commit()
+
 
     company = Company(name="Dayflow Demo Co", company_code=COMPANY_CODE, logo_url=None)
     db.add(company)
