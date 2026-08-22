@@ -1,8 +1,5 @@
-<!doctype html>
-<html><head><script src="https://cdn.jsdelivr.net/npm/chart.js"></script><style>body{font-family:system-ui,sans-serif;margin:2rem}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem}.card{padding:1rem;border:1px solid #ddd;border-radius:.4rem}#state{padding:.75rem;color:#555}canvas{max-width:540px;margin-top:2rem}</style></head><body>
-<nav><a href="/employees">Employees</a> | <a href="/attendance/view">Attendance</a> | <a href="/time-off">Time Off</a> | <a href="/dashboard">Dashboard</a></nav>
-<h1>Analytics dashboard</h1><div id="state">Loading dashboard…</div><div id="cards" class="cards" hidden></div><canvas id="chart" hidden></canvas>
+{% extends "base.html" %}{% block extra_head %}<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>{% endblock %}{% block content %}<p class="eyebrow">Company pulse</p><h1>Analytics dashboard</h1><div id="state">Loading dashboard…</div><div id="cards" class="cards" hidden></div><canvas id="chart" hidden></canvas>
 <script>
 const headers={Authorization:'Bearer '+localStorage.token};
 async function load(){try{const r=await fetch('/api/dashboard',{headers});if(!r.ok)throw new Error((await r.json()).detail);const d=await r.json();state.hidden=true;cards.hidden=false;chart.hidden=false;cards.innerHTML=[['Headcount',d.headcount],['Checked in today',d.checked_in_today],['Attendance rate',d.attendance_rate+'%'],['Pending leave',d.pending_leave_requests],['Payroll ready',d.payroll_ready_count]].map(([k,v])=>`<article class="card"><small>${k}</small><strong>${v}</strong></article>`).join('');new Chart(chart,{type:'bar',data:{labels:['Checked in','Pending leave','Payroll ready'],datasets:[{label:'Employees',data:[d.checked_in_today,d.pending_leave_requests,d.payroll_ready_count],backgroundColor:['#36a2eb','#ffce56','#4bc0c0']}]},options:{responsive:true}})}catch(error){state.textContent='Unable to load dashboard: '+error.message}}load();
-</script></body></html>
+</script>{% endblock %}

@@ -63,3 +63,13 @@ def attendance_page(request: Request):
 @app.get("/time-off", response_class=HTMLResponse)
 def time_off_page(request: Request):
     return templates.TemplateResponse(request, "time_off.html")
+
+
+@app.get("/payroll", response_class=HTMLResponse)
+def payroll_page(request: Request):
+    return templates.TemplateResponse(request, "payroll.html")
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+def dashboard_page(request: Request):
+    return templates.TemplateResponse(request, "dashboard.html")
